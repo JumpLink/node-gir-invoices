@@ -9,6 +9,7 @@ lib-cov
 *.pdf
 *.sublime-*
 *.bak
+*.json
 
 pids
 logs

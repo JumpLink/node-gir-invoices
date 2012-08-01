@@ -3,120 +3,78 @@ var Gir = require('gir')
 , DateFormat = require('dateformatjs').DateFormat
 , df = new DateFormat("dd'.'MM'.'yyyy")
 , current_date = df.format(new Date())
-, pdf = require('pdfkit')
 , util = require('util')
 , exec = require('child_process').exec
-, argv = require('optimist').argv
+, Fiber = require('fibers');
 ;
 
 var win
-, entry_date
-, cust_first_name
-, cust_name
-, pdf_button
-;
+  , entry_date
+  , cust_first_name
+  , cust_name
+  , pdf_button
+  , box_main
+  , article
+  ;
 
-doc = new pdf;
+function create_article_inputs() {
+  var article = {
+    box: new Gtk.Box(),
+    quantity: new Gtk.Entry(),
+    model: new Gtk.Entry(),
+    title: new Gtk.Entry(),
+    shipping_price: new Gtk.Entry()
+  }
+  article.box.orientation = Gtk.Orientation.horizontal;
 
-function generate_pdf(pdf_uri) {
-  console.log(pdf_uri);
-  //# Embed a font, set the font size, and render some text
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-B.ttf')
-     .fontSize(11)
-     .text('test', 320, 40);
+  article.quantity.set_width_chars(2);
+  article.model.set_width_chars(2);
+  article.shipping_price.set_width_chars(2);
+  article.title.set_width_chars(-1);
 
-  doc.text('the aircooled Hulashop');
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf');
-  doc.moveDown();
-  doc.text('testweg 35');
-  doc.text('D-00303 Mond');
-  doc.text('fon.  123456');
-  doc.text('fax.   123456');
-  doc.text('mail.   info@test.com');
-  doc.text('web.   www.test.com');
-  doc.moveDown();
-  doc.moveDown();
-  //doc.text('Datum: '+entry_date.text);
-  doc.moveDown();
-  doc.text('Vorgangsnr.:  01');
-  doc.text('Kunde:');
+  article.title.hexpand_set = true;
+  article.title.vexpand_set = true;
 
-  //doc.image('public/pdf/logo.png', 40, 40, {fit: [200, 500]})
+  article.box.pack_start(article.quantity, true, true, 0);
+  article.box.pack_start(article.model, true, true, 0);
+  article.box.pack_start(article.title, true, true, 0);
+  article.box.pack_start(article.shipping_price, true, true, 0);
 
-  doc.fontSize(14)
-    .text(cust_first_name.text+' '+cust_name.text,45,155)
-    .text("Teststraße 1")
-    .text("00000 Moond")
-    .rect(40, 150, 200, 100)
-    .stroke();
-
-  doc.moveDown(8);
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-B.ttf');
-  doc.text("Auftragsbestätigung und Rechnung", {align: 'center'});
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf');
-  doc.fontSize(12);
-  doc.text("Gemäß Ihrer Bestellung liefern wir folgende Waren:", {align: 'left'});
-  doc.moveDown();
-
-  var abstand = 110;
-  var menge = {x:doc.x-5, y:doc.y};
-  var nr = {x:doc.x+40, y:doc.y};
-  var bez = {x:doc.x+100, y:doc.y};
-  var preis = {x:doc.x+400, y:doc.y};
-  var gesamt = {x:doc.x+500, y:doc.y};
-
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-B.ttf');
-  doc.fontSize(8);
-
-  doc.text("Menge", menge.x, menge.y);
-  doc.text("Artikel-Nr.", nr.x, nr.y);
-  doc.text("Bezeichnung", bez.x, bez.y);
-  doc.text("Preis/Stck.", preis.x, preis.y);
-  doc.text("Gesamt", gesamt.x, gesamt.y);
-
-  doc.moveTo(menge.x, doc.y) 
-    .lineTo(gesamt.x+30, doc.y)
-    .stroke();
-
-  doc.font('/usr/share/fonts/truetype/ubuntu-font-family/Ubuntu-R.ttf');
-
-  menge.y = doc.y+3;
-  nr.y = doc.y+3;
-  bez.y = doc.y+3;
-  preis.y = doc.y+3;
-  gesamt.y = doc.y+3;
-
-  doc.text("1", menge.x, menge.y);
-  doc.text("AC898040", nr.x, nr.y);
-  doc.text("DACHGEPÄCKTRÄGER VW BUS EDELSTAHL POLIERT 4- BOGEN", bez.x, bez.y);
-  doc.text("719,95", preis.x, preis.y);
-  doc.text("719,95", gesamt.x, gesamt.y);
-
-  doc.moveDown(2);
-
-  var y = doc.y;
-  doc.text("Versand Spedition",bez.x, y);
-  doc.text("79,5",gesamt.x, y);
-
-  doc.moveTo(menge.x, doc.y) 
-    .lineTo(gesamt.x+30, doc.y)
-    .stroke();
-
-  doc.text ("Gesamt", 40, doc.y);
-  doc.text ("incl. 19 % MwSt", 40, doc.y);
-
-  doc.text("Zahlungsart: per Vorkasse ohne Abzug!",40,750);
-  doc.text("Vielen Dank für Ihren Einkauf.");
-
-  doc.write(pdf_uri);
+  return article;
 }
 
 function create_ui() {
+  Gtk.init(0);
 	var builder = new Gtk.Builder ();
 	builder.add_from_file ("ui/main.ui");
 	win = builder.get_object ("main");
 	entry_date = builder.get_object ("entry_date");
 	pdf_button = builder.get_object ("pdf_button");
+  box_main = builder.get_object ("box_main");
+
+  var builder_article = new Gtk.Builder ();
+  builder_article.add_from_file ("ui/article.ui");
+  var frame_article = builder_article.get_object ("frame_article");
+  var btn_add = builder_article.get_object ("btn_add");
+  var box_all_article = builder_article.get_object ("box_all_article");
+  var article = [];
+
+  // <- customer
+    var cust_name = builder.get_object ("cust_name");
+    var cust_first_name = builder.get_object ("cust_first_name");
+    var cust_company = builder.get_object ("cust_company");
+    var cust_street = builder.get_object ("cust_street");
+    var cust_street_num = builder.get_object ("cust_street_num");
+    var cust_plz = builder.get_object ("cust_plz");
+    var cust_ort = builder.get_object ("cust_ort");
+  // -> customer
+
+  article.push(create_article_inputs());
+  box_all_article.pack_start(article[0].box, true, true, 0);
+  
+
+  box_main.pack_start(frame_article, true, true, 0);
+
 	entry_date.text = current_date;
 
 	win.show_all();
@@ -127,10 +85,39 @@ function create_ui() {
 	    Gtk.mainQuit();
 	});
 
-	pdf_button.on("clicked", function(){
-		generate_pdf('test.pdf');
-	});
+  function sleep(ms) {
+      var fiber = Fiber.current;
+      setTimeout(function() {
+          fiber.run();
+      }, ms);
+      Fiber.yield();
+  }
 
+  var add_button_clicked = Fiber(function() {
+    console.log("clicked");
+    article.push(create_article_inputs());
+    console.log(article.length-1);
+    box_all_article.pack_start(article[article.length-1].box, true, true, 0);
+    win.show_all();
+  });
+
+  //If this is commented out the second button works.
+	// pdf_button.on("clicked", function(){
+ //    var filename = "-o test.pdf ";
+ //    var customer_first_name = "-N "+cust_first_name.text+" ";
+ //    var customer_name = "-n "+cust_name.text+" ";
+ //    var customer_company = "-c "+cust_company.text+" ";
+ //    var customer_street = "-s "+cust_street.text+" ";
+ //    var customer_street_num = "-sn "+cust_street_num.text+" ";
+ //    var customer_plz = "-l "+cust_plz.text+" "+cust_ort.text+" ";
+ //    exec('node pdf.js '+filename+customer_first_name+customer_name+customer_company+customer_street+customer_street_num+customer_plz+customer_ort);
+ //  });
+
+  btn_add.on("clicked", function(){
+    add_button_clicked.run();
+  });
+
+  Gtk.main();
 }
 
 function print_jobs(pdf_uri, customer, date, count, cb) {
@@ -139,6 +126,4 @@ function print_jobs(pdf_uri, customer, date, count, cb) {
   console.log("done");
 }
 
-Gtk.init(0);
 create_ui();
-Gtk.main();
