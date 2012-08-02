@@ -10,6 +10,12 @@ lib-cov
 *.sublime-*
 *.bak
 *.json
+*.vapi
+*.gir
+*.so
+*.typelib
+*.a
+*.o
 
 pids
 logs
